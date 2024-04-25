@@ -8,3 +8,6 @@ Tampermonkey script for CLI like navigation through command history using ⌘ + 
 1. Open Tampermonkey in your browser and click the Add Script tab (icon with a plus symbol)
 1. Paste the source into the script window and hit save
 1. Voila!
+
+## Demo
+![Demo of ChatGPT Command History](demo.gif)
