@@ -1,4 +1,4 @@
-# chatgpt-command-history
+# chatgpt-prompt-history
 Tampermonkey script for CLI like navigation through command history using ⌘ + up and down arrow keys in ChatGPT
 
 ## Installation
@@ -10,4 +10,4 @@ Tampermonkey script for CLI like navigation through command history using ⌘ + 
 1. Voila!
 
 ## Demo
-![Demo of ChatGPT Command History](demo.gif)
+![Demo of ChatGPT Prompt History](demo.gif)
