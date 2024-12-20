@@ -1,38 +1,51 @@
 // ==UserScript==
-// @name         ChatGPT Command History
+// @name         ChatGPT Command History v2
 // @namespace    http://tampermonkey.net/
-// @version      0.1
+// @version      0.2
 // @description  Allows navigation through command history using ⌘ + up and down arrow keys in ChatGPT.
 // @author       Daniel Ye
-// @match        https://chat.openai.com/*
+// @match        https://chatgpt.com/*
 // @grant        none
 // ==/UserScript==
 
 (function() {
     'use strict';
+
     // Array to store command history
-    var messageNodes = document.querySelectorAll('[data-message-author-role="user"]');
-    var commandHistory = Array.from(messageNodes).map(a => a.textContent)
-    var currentIndex = commandHistory.length;
+    let messageNodes = document.querySelectorAll('[data-message-author-role="user"]');
+    let commandHistory = Array.from(messageNodes).map(a => a.textContent);
+    let currentIndex = commandHistory.length;
 
     // Change this selector to match the input field in ChatGPT
-    var inputField = document.querySelector("#prompt-textarea")
+    let inputField = document.querySelector("#prompt-textarea");
 
     // Select the target node you want to observe for changes
-    var targetNode = document.body
+    const targetNode = document.body;
 
     // Options for the observer (which mutations to observe)
-    var config = { attributes: true, childList: true, subtree: true };
+    const config = { attributes: true, childList: true, subtree: true };
 
     // Callback function to execute when mutations are observed
-    var callback = function(mutationsList, observer) {
-        messageNodes = document.querySelectorAll('[data-message-author-role="user"]');
-        commandHistory = Array.from(messageNodes).map(a => a.textContent)
-        currentIndex = commandHistory.length;
+    const callback = function(mutationsList, observer) {
+        const newMessageNodes = document.querySelectorAll('[data-message-author-role="user"]');
+        const newCommandHistory = Array.from(newMessageNodes).map(a => a.textContent);
+
+        // Update command history only if there's a new message
+        if (newCommandHistory.length > commandHistory.length) {
+            commandHistory = newCommandHistory;
+
+            // Adjust currentIndex only if it was at the end
+            if (currentIndex === commandHistory.length - 1) {
+                currentIndex = commandHistory.length;
+            }
+        }
+
+        // Re-select the input field in case of page updates
         inputField = document.querySelector("#prompt-textarea");
     };
+
     // Create an observer instance linked to the callback function
-    var observer = new MutationObserver(callback);
+    const observer = new MutationObserver(callback);
 
     // Start observing the target node for configured mutations
     observer.observe(targetNode, config);
@@ -53,8 +66,7 @@
                     currentIndex++;
                     if (currentIndex === commandHistory.length) {
                         populateInput("");
-                    }
-                    else {
+                    } else {
                         populateInput(commandHistory[currentIndex]);
                     }
                 }
@@ -65,7 +77,10 @@
     // Function to populate input field with command
     function populateInput(command) {
         if (inputField) {
-            inputField.value = command;
+            inputField.innerHTML = '';
+            let child = document.createElement('p');
+            child.innerHTML = command;
+            inputField.appendChild(child)
         }
     }
 
