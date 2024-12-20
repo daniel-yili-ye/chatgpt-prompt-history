@@ -11,66 +11,121 @@
 (function() {
     'use strict';
 
-    // Array to store command history
-    let messageNodes = document.querySelectorAll('[data-message-author-role="user"]');
-    let commandHistory = Array.from(messageNodes).map(a => a.textContent);
-    let currentIndex = commandHistory.length;
+    let commandHistory = [];
+    let currentIndex = 0;
+    let inputField = null;
+    let initialized = false;
+    let currentChatId = null;
 
-    // Change this selector to match the input field in ChatGPT
-    let inputField = document.querySelector("#prompt-textarea");
+    // Function to get current chat ID from URL
+    function getCurrentChatId() {
+        const match = window.location.pathname.match(/\/c\/([\w-]+)/);
+        return match ? match[1] : null;
+    }
 
-    // Select the target node you want to observe for changes
-    const targetNode = document.body;
+    // Initialize or reinitialize the command history
+    function initializeHistory() {
+        const messageNodes = document.querySelectorAll('[data-message-author-role="user"]');
+        const newChatId = getCurrentChatId();
 
-    // Options for the observer (which mutations to observe)
-    const config = { attributes: true, childList: true, subtree: true };
-
-    // Callback function to execute when mutations are observed
-    const callback = function(mutationsList, observer) {
-        const newMessageNodes = document.querySelectorAll('[data-message-author-role="user"]');
-        const newCommandHistory = Array.from(newMessageNodes).map(a => a.textContent);
-
-        // Update command history only if there's a new message
-        if (newCommandHistory.length > commandHistory.length) {
-            commandHistory = newCommandHistory;
-
-            // Adjust currentIndex only if it was at the end
-            if (currentIndex === commandHistory.length - 1) {
+        if (messageNodes.length > 0) {
+            // If we're in a new chat, reset everything
+            if (newChatId !== currentChatId) {
+                currentChatId = newChatId;
+                commandHistory = Array.from(messageNodes).map(a => a.textContent);
                 currentIndex = commandHistory.length;
+                console.log('ChatGPT History: Switched to new chat with', commandHistory.length, 'messages');
             }
+
+            inputField = document.querySelector("#prompt-textarea");
+            initialized = true;
+            return true;
         }
+        return false;
+    }
 
-        // Re-select the input field in case of page updates
-        inputField = document.querySelector("#prompt-textarea");
-    };
+    // Function to wait for chat content to load
+    function waitForChat() {
+        const checkInterval = setInterval(() => {
+            if (initializeHistory()) {
+                clearInterval(checkInterval);
+                setupObserver();
+            }
+        }, 1000);
 
-    // Create an observer instance linked to the callback function
-    const observer = new MutationObserver(callback);
+        setTimeout(() => {
+            clearInterval(checkInterval);
+            if (!initialized) {
+                console.log('ChatGPT History: Failed to initialize after 30 seconds');
+            }
+        }, 30000);
+    }
 
-    // Start observing the target node for configured mutations
-    observer.observe(targetNode, config);
+    // Setup mutation observer
+    function setupObserver() {
+        const observer = new MutationObserver((mutationsList, observer) => {
+            // Check if we've navigated to a new chat
+            const newChatId = getCurrentChatId();
+            if (newChatId !== currentChatId) {
+                initializeHistory();
+                return;
+            }
+
+            const messageNodes = document.querySelectorAll('[data-message-author-role="user"]');
+            const newHistory = Array.from(messageNodes).map(a => a.textContent);
+
+            // Update history if it's changed
+            if (JSON.stringify(newHistory) !== JSON.stringify(commandHistory)) {
+                commandHistory = newHistory;
+                currentIndex = commandHistory.length;
+                console.log('ChatGPT History: Updated to', commandHistory.length, 'messages');
+            }
+
+            // Update input field reference if needed
+            inputField = document.querySelector("#prompt-textarea");
+        });
+
+        // Observe both body (for content changes) and URL changes
+        observer.observe(document.body, {
+            attributes: true,
+            childList: true,
+            subtree: true
+        });
+
+        // Also watch for URL changes
+        let lastUrl = location.href;
+        new MutationObserver(() => {
+            const url = location.href;
+            if (url !== lastUrl) {
+                lastUrl = url;
+                initializeHistory();
+            }
+        }).observe(document, {subtree: true, childList: true});
+    }
 
     // Function to handle key press event
     function handleKeyPress(event) {
+        if (!initialized || !commandHistory.length) return;
+
         const commandKey = event.metaKey || event.ctrlKey;
-        if (commandKey) {
-            if (event.key === "ArrowUp") {
-                event.preventDefault();
-                if (0 < currentIndex) {
-                    currentIndex--;
-                    populateInput(commandHistory[currentIndex]);
-                }
+
+        if (commandKey && (event.key === "ArrowUp" || event.key === "ArrowDown")) {
+            event.preventDefault();
+
+            if (event.key === "ArrowUp" && currentIndex > 0) {
+                currentIndex--;
+                populateInput(commandHistory[currentIndex]);
             } else if (event.key === "ArrowDown") {
-                event.preventDefault();
-                if (currentIndex < commandHistory.length) {
+                if (currentIndex < commandHistory.length - 1) {
                     currentIndex++;
-                    if (currentIndex === commandHistory.length) {
-                        populateInput("");
-                    } else {
-                        populateInput(commandHistory[currentIndex]);
-                    }
+                    populateInput(commandHistory[currentIndex]);
+                } else if (currentIndex === commandHistory.length - 1) {
+                    currentIndex = commandHistory.length;
+                    populateInput("");
                 }
             }
+
+            console.log('ChatGPT History: Navigated to index', currentIndex);
         }
     }
 
@@ -84,7 +139,9 @@
         }
     }
 
-    // Event listener for key press
+    // Add event listener for key press
     document.addEventListener('keydown', handleKeyPress);
-})();
 
+    // Start initialization process
+    waitForChat();
+})();
